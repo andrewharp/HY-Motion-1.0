@@ -31,7 +31,7 @@
 
 
 <p align="center">
-  <img src="./assets/teaser.jpg" alt="Teaser" width="90%">
+  <img src="./assets/teaser.jpg" alt="Teaser" width="100%">
 </p>
 
 
