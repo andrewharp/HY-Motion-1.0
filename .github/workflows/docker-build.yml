@@ -2,7 +2,7 @@ name: Docker Build and Deploy
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, feature/baked-models, feature/runpod-serverless ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -59,20 +59,30 @@ jobs:
 
   build-api:
     runs-on: ubuntu-latest
-    name: Build API Image
+    name: Build API Image (with baked models)
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout with LFS (for model files)
         uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Verify model files
+        run: |
+          echo "=== Checking model files ==="
+          ls -lah ckpts/ || echo "No ckpts directory"
+          ls -lah ckpts/tencent/HY-Motion-1.0/ 2>/dev/null || echo "No HY-Motion-1.0 models"
+          du -sh ckpts/ 2>/dev/null || echo "Cannot check size"
 
       - name: Free up disk space
         run: |
           sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
           sudo apt-get clean
           docker system prune -af
+          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -98,6 +108,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:latest
             ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:${{ steps.short-sha.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
