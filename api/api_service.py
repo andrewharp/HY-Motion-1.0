@@ -41,9 +41,13 @@ async def lifespan(app: FastAPI):
     # Let pipeline auto-discover model path from multiple locations
     # (supports both /workspace network volume and /app Docker image)
     print("Auto-discovering model path...")
-    pipeline = HYMotionRetargetingPipeline(model_path=None)  # Auto-discover
-    # Model is loaded lazily on first request to avoid startup delays
-    print("Pipeline initialized. Model will be loaded on first request.")
+    try:
+        pipeline = HYMotionRetargetingPipeline(model_path=None)  # Auto-discover
+        print("Pipeline initialized. Model will be loaded on first request.")
+    except Exception as e:
+        print(f"WARNING: Failed to initialize pipeline: {e}")
+        print("API will start in degraded mode.")
+        pipeline = None
     yield
     # Shutdown
     if pipeline:
