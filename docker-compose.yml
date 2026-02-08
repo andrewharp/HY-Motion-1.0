@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  hymotion:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      tags:
+        - hymotion:1.0
+        - hymotion:latest
+    image: hymotion:1.0
+    container_name: hymotion-server
+    runtime: nvidia  # Required for GPU access on Jetson
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - USE_HF_MODELS=1
+      - DISABLE_PROMPT_ENGINEERING=True
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface
+      - HF_HOME=/app/.cache/huggingface
+      - PYTHONUNBUFFERED=1
+    volumes:
+      # Mount for persistent model storage
+      - ./ckpts:/app/ckpts
+      - ./output:/app/HY-Motion-1.0/output
+      # Cache for downloaded models
+      - hymotion-cache:/app/.cache/huggingface
+    ports:
+      - "7860:7860"  # Gradio web UI
+      - "8000:8000"  # Optional API
+    working_dir: /app/HY-Motion-1.0
+    stdin_open: true
+    tty: true
+    # Default to Gradio web interface
+    command: ["python3", "gradio_app.py", "--server_name", "0.0.0.0", "--server_port", "7860"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  hymotion-cache:
+    driver: local
