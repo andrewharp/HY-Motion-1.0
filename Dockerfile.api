@@ -57,7 +57,7 @@ RUN pip install --no-cache-dir comfy-kitchen comfy-aimdo
 # Clone HY-Motion-1.0 and ComfyUI-HyMotion
 RUN git clone https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && \
     cd HY-Motion-1.0 && git lfs pull || true
-RUN git clone https://github.com/antoineeripret/ComfyUI-HyMotion.git
+RUN git clone https://github.com/jtydhr88/ComfyUI-HY-Motion1.git ComfyUI-HyMotion
 
 # Copy API files (includes patch script)
 COPY api/ /app/api/
