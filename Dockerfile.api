@@ -67,24 +67,20 @@ RUN git clone --depth 1 https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git HY-
 RUN git clone --depth 1 https://github.com/jtydhr88/ComfyUI-HY-Motion1.git ComfyUI-HyMotion
 
 # =============================================================================
-# COPY MODELS INTO IMAGE (baked in, not network volume)
+# DOWNLOAD MODELS INTO IMAGE (baked in, not network volume)
 # =============================================================================
-# These are copied from the local ckpts/ directory which should contain:
-# - ckpts/tencent/HY-Motion-1.0/ (config.yml, latest.ckpt, latest.pt)
-# - ckpts/tencent/HY-Motion-1.0-Lite/ (optional)
-# - ckpts/clip-vit-large-patch14/ (CLIP text encoder)
-# - ckpts/Qwen3-8B/ (Qwen text encoder)
+# Download from HuggingFace Hub during build
+# This ensures models are always fresh and doesn't require them in git
 
-COPY ckpts/ /app/HY-Motion-1.0/ckpts/
-
-# Verify models are present
-RUN echo "=== Verifying model files ===" && \
-    ls -lah /app/HY-Motion-1.0/ckpts/ && \
+RUN mkdir -p /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0 && \
+    echo "=== Downloading HY-Motion-1.0 models (~7.7GB)... ===" && \
+    huggingface-cli download tencent/HY-Motion-1.0 \
+        --local-dir /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0 \
+        --local-dir-use-symlinks False && \
+    echo "=== Verifying model files ===" && \
     ls -lah /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/ && \
     test -f /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/config.yml && \
-    (test -f /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/latest.ckpt || \
-     test -f /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/latest.pt) && \
-    echo "✓ Model files verified"
+    echo "✓ Model files downloaded and verified"
 
 # Copy API files (includes patch script)
 COPY api/ /app/api/
