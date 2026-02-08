@@ -23,8 +23,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
     libgl1-mesa-glx libgtk-3-0 libgl1 \
     build-essential protobuf-compiler libprotobuf-dev \
-    blender \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Blender via snap or direct download
+RUN wget -q https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz -O /tmp/blender.tar.xz && \
+    tar -xf /tmp/blender.tar.xz -C /opt && \
+    ln -s /opt/blender-4.0.2-linux-x64/blender /usr/local/bin/blender && \
+    rm /tmp/blender.tar.xz
 
 # Install Python dependencies
 RUN pip install --upgrade pip setuptools wheel
