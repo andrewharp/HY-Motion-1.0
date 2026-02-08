@@ -57,19 +57,11 @@ RUN git clone https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && \
     cd HY-Motion-1.0 && git lfs pull || true
 RUN git clone https://github.com/antoineeripret/ComfyUI-HyMotion.git
 
-# Fix text_encoder meta tensor issue for API use
-RUN sed -i '/self.llm_text_encoder.eval().requires_grad_(False)/a\\
-        \n        # Materialize any remaining meta tensors for API\n\
-        for model in [self.sentence_emb_text_encoder, self.llm_text_encoder]:\n\
-            for name, param in model.named_parameters():\n\
-                if param.device.type == \"meta\":\n\
-                    print(f\"[HYTextModel] Materializing meta tensor: {name}\")\n\
-                    from accelerate.utils import set_module_tensor_to_device\n\
-                    set_module_tensor_to_device(model, name, \"cpu\", torch.empty_like(param, device=\"cpu\"))' \
-    /app/ComfyUI-HyMotion/hymotion/network/text_encoders/text_encoder.py
-
-# Copy API files
+# Copy API files (includes patch script)
 COPY api/ /app/api/
+
+# Fix text_encoder meta tensor issue for API use
+RUN python3 /app/api/patch_text_encoder.py
 
 # Fix config paths
 RUN sed -i 's|mean_std_dir: ./stats/|mean_std_dir: /app/HY-Motion-1.0/stats/|g' \
