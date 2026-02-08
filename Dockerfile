@@ -21,6 +21,7 @@ ENV TRANSFORMERS_CACHE=/app/.cache/huggingface
 ENV HF_HOME=/app/.cache/huggingface
 
 # Install system dependencies
+# Note: libgl1-mesa-glx removed (not available in Ubuntu 24.04), libgl1 provides GL support
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     git-lfs \
@@ -32,9 +33,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    libgl1-mesa-glx \
-    libgtk-3-0 \
     libgl1 \
+    libglx-mesa0 \
+    libgtk-3-0 \
     build-essential \
     protobuf-compiler \
     libprotobuf-dev \
