@@ -10,6 +10,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
+ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
 # Set up environment
 ENV PYTHONPATH="/app:/app/HY-Motion-1.0:/app/ComfyUI-HyMotion:/app/ComfyUI:${PYTHONPATH}"
@@ -44,7 +45,7 @@ RUN pip install --no-cache-dir fbxsdkpy
 
 # Clone ComfyUI (required for text encoder)
 WORKDIR /app
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
+RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
     pip install --no-cache-dir -r requirements.txt
 
@@ -52,13 +53,6 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
 RUN git clone https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && \
     cd HY-Motion-1.0 && git lfs pull || true
 RUN git clone https://github.com/antoineeripret/ComfyUI-HyMotion.git
-
-# Download model weights
-RUN mkdir -p /app/HY-Motion-1.0/ckpts && \
-    cd /app/HY-Motion-1.0/ckpts && \
-    pip install -q huggingface_hub && \
-    python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='tencent/HY-Motion-1.0', local_dir='HY-Motion-1.0', local_dir_use_symlinks=False)" || \
-    echo "Model download skipped - will download at runtime"
 
 # Copy API files
 COPY api/ /app/api/
