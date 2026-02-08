@@ -77,4 +77,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
-CMD ["python3", "/app/api/api_service.py"]
+# Use a startup script that calls the base image's entrypoint and starts our API
+COPY api/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
