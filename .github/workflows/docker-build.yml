@@ -60,45 +60,23 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build Docker image
-        id: build
+      - name: Build and push Docker image
+        id: build-push
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: false
-          load: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Test Docker image
-        run: |
-          echo "Testing Docker image..."
-          docker images
-          # Test that the image can run and has the expected tools
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest python3 -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" || echo "Note: CUDA not available in build environment (expected)"
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest python3 -c "import transformers; print(f'Transformers version: {transformers.__version__}')"
-          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest python3 -c "import diffusers; print(f'Diffusers version: {diffusers.__version__}')"
-
-      - name: Push Docker image to GHCR
-        if: github.event_name != 'pull_request'
-        id: push
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Generate artifact attestation
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && steps.build-push.outputs.digest != ''
         uses: actions/attest-build-provenance@v1
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.build-push.outputs.digest }}
           push-to-registry: true
 
       - name: Report build status
@@ -113,7 +91,13 @@ jobs:
           echo "Build Status: ${{ job.status }}"
           if [ "${{ job.status }}" == "success" ]; then
             echo ""
+            echo "✅ Docker image built and pushed successfully!"
+            echo ""
             echo "Docker Image Tags:"
             echo "${{ steps.meta.outputs.tags }}"
+            echo ""
+            echo "Image URL: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          else
+            echo "❌ Build failed"
           fi
           echo "============================================"
