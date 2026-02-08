@@ -42,8 +42,8 @@ RUN pip install --no-cache-dir \
     einops==0.8.1 safetensors==0.5.3 scipy>=1.10.0 \
     transforms3d==0.4.2 omegaconf==2.3.0 click==8.1.3
 
-# Install FBX SDK
-RUN pip install --no-cache-dir fbxsdkpy
+# Install FBX SDK from custom index
+RUN pip install --no-cache-dir fbxsdkpy --extra-index-url https://gitlab.inria.fr/api/v4/projects/18692/packages/pypi/simple
 
 # Clone ComfyUI (required for text encoder)
 WORKDIR /app
