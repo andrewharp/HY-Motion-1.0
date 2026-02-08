@@ -1,6 +1,6 @@
 # HY-Motion-1.0 API Dockerfile
-# FastAPI service for text-to-animation on Mixamo/ReadyPlayerMe avatars
-# Models are BAKED INTO the image (no network volume required)
+# FastAPI service with models DOWNLOADED during build (baked into image)
+# No network volume required
 
 FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
 
@@ -13,14 +13,13 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
 ENV PIP_BREAK_SYSTEM_PACKAGES=1
 
-# Set up environment
 ENV PYTHONPATH="/app:/app/HY-Motion-1.0:/app/ComfyUI-HyMotion:/app/ComfyUI:${PYTHONPATH}"
 ENV CKPTS_DIR=/app/HY-Motion-1.0/ckpts
 ENV COMFYUI_PATH=/app/ComfyUI
 ENV USE_HF_MODELS=0  # Use local models
 ENV HF_HOME=/app/.cache/huggingface
 
-# Install minimal system dependencies
+# Install system dependencies
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     git-lfs protobuf-compiler libprotobuf-dev python3-yaml \
     libgl1-mesa-glx libxi6 libxrender1 \
@@ -48,53 +47,75 @@ RUN pip install --no-cache-dir \
     einops==0.8.1 safetensors==0.5.3 scipy>=1.10.0 \
     transforms3d==0.4.2 omegaconf==2.3.0 click==8.1.3
 
-# Install FBX SDK from custom index
+# Install FBX SDK
 RUN pip install --no-cache-dir fbxsdkpy --extra-index-url https://gitlab.inria.fr/api/v4/projects/18692/packages/pypi/simple
 
-# Clone ComfyUI (required for text encoder)
+# Clone ComfyUI
 WORKDIR /app
 RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git && \
     cd ComfyUI && \
     pip install --no-cache-dir -r requirements.txt
 
-# Install ComfyUI-HyMotion specific dependencies
+# Install ComfyUI-HyMotion dependencies
 RUN pip install --no-cache-dir comfy-kitchen comfy-aimdo
 
-# Clone HY-Motion-1.0 (code only)
-RUN git clone --depth 1 https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git HY-Motion-1.0-temp && \
-    mv HY-Motion-1.0-temp/* HY-Motion-1.0/ 2>/dev/null || true && \
-    rm -rf HY-Motion-1.0-temp
+# Clone HY-Motion-1.0
+RUN git clone --depth 1 https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && \
+    cd HY-Motion-1.0 && \
+    rm -rf ckpts  # We'll download models separately
 RUN git clone --depth 1 https://github.com/jtydhr88/ComfyUI-HY-Motion1.git ComfyUI-HyMotion
 
 # =============================================================================
-# DOWNLOAD MODELS INTO IMAGE (baked in, not network volume)
+# DOWNLOAD MODELS DURING BUILD (baked into image)
 # =============================================================================
-# Download from HuggingFace Hub during build
-# This ensures models are always fresh and doesn't require them in git
 
-RUN mkdir -p /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0 && \
-    echo "=== Downloading HY-Motion-1.0 models (~7.7GB)... ===" && \
+WORKDIR /app/HY-Motion-1.0
+
+# Create ckpts directory structure
+RUN mkdir -p ckpts/tencent
+
+# Download HY-Motion-1.0 models from HuggingFace
+RUN echo "=== Downloading HY-Motion-1.0 models ===" && \
     huggingface-cli download tencent/HY-Motion-1.0 \
-        --local-dir /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0 \
+        --include "HY-Motion-1.0/*" \
+        --local-dir ckpts/tencent \
         --local-dir-use-symlinks False && \
-    echo "=== Verifying model files ===" && \
-    ls -lah /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/ && \
-    test -f /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/config.yml && \
-    echo "✓ Model files downloaded and verified"
+    echo "✓ HY-Motion-1.0 models downloaded"
 
-# Copy API files (includes patch script)
+# Download CLIP text encoder
+RUN echo "=== Downloading CLIP text encoder ===" && \
+    huggingface-cli download openai/clip-vit-large-patch14 \
+        --local-dir ckpts/clip-vit-large-patch14 \
+        --local-dir-use-symlinks False && \
+    echo "✓ CLIP downloaded"
+
+# Download Qwen text encoder (optional, for prompt rewriting)
+RUN echo "=== Downloading Qwen text encoder ===" && \
+    huggingface-cli download Qwen/Qwen3-8B \
+        --local-dir ckpts/Qwen3-8B \
+        --local-dir-use-symlinks False || \
+    echo "⚠ Qwen download failed (optional)"
+
+# Verify models are present
+RUN echo "=== Verifying model files ===" && \
+    ls -lah ckpts/tencent/HY-Motion-1.0/ && \
+    test -f ckpts/tencent/HY-Motion-1.0/config.yml && \
+    (test -f ckpts/tencent/HY-Motion-1.0/latest.ckpt || \
+     test -f ckpts/tencent/HY-Motion-1.0/latest.pt) && \
+    echo "✓ Model files verified" && \
+    du -sh ckpts/
+
+# Copy API files
 COPY api/ /app/api/
 COPY hymotion/ /app/hymotion/
 COPY stats/ /app/stats/
 
-# Fix text_encoder meta tensor issue for API use
+# Fix text_encoder meta tensor issue
 RUN python3 /app/api/patch_text_encoder.py || echo "Patch script completed"
 
 # Fix config paths for container
 RUN sed -i 's|mean_std_dir: ./stats/|mean_std_dir: /app/stats/|g' \
-    /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/config.yml && \
-    sed -i 's|mean_std_dir: ./stats/|mean_std_dir: /app/stats/|g' \
-    /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0-Lite/config.yml 2>/dev/null || true
+    /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/config.yml
 
 WORKDIR /app
 
@@ -103,7 +124,7 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=120s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:8000/health', timeout=5)" || exit 1
 
-# Use a startup script that calls the base image's entrypoint and starts our API
+# Startup script
 COPY api/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
