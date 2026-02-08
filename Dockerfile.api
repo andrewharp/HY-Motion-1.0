@@ -76,6 +76,8 @@ WORKDIR /app/HY-Motion-1.0
 RUN mkdir -p ckpts/tencent
 
 # Download HY-Motion-1.0 models from HuggingFace
+# Disable hf_transfer to avoid dependency issues
+ENV HF_HUB_ENABLE_HF_TRANSFER=0
 RUN echo "=== Downloading HY-Motion-1.0 models ===" && \
     huggingface-cli download tencent/HY-Motion-1.0 \
         --include "HY-Motion-1.0/*" \
