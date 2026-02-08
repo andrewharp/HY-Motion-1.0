@@ -46,6 +46,6 @@ jobs:
           context: .
           file: ./Dockerfile.api
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:latest
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
