@@ -36,12 +36,13 @@ class HYMotionRetargetingPipeline:
     
     def __init__(self, model_path=None, device='cuda'):
         # Prioritize network drive (/workspace) over Docker image (/app)
+        # Models are in ckpts/tencent/HY-Motion-1.0/ structure
         if model_path is None:
             # Check network drive first
-            if os.path.exists('/workspace/HY-Motion-1.0/ckpts'):
-                model_path = '/workspace/HY-Motion-1.0/ckpts'
+            if os.path.exists('/workspace/HY-Motion-1.0/ckpts/tencent'):
+                model_path = '/workspace/HY-Motion-1.0/ckpts/tencent'
             else:
-                model_path = '/app/HY-Motion-1.0/ckpts'
+                model_path = '/app/HY-Motion-1.0/ckpts/tencent'
         # Verify the path exists
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model path not found: {model_path}")
@@ -68,8 +69,8 @@ class HYMotionRetargetingPipeline:
             if not os.path.exists(config_path):
                 # Try alternative locations
                 alt_paths = [
-                    '/workspace/HY-Motion-1.0/ckpts',
-                    '/app/HY-Motion-1.0/ckpts',
+                    '/workspace/HY-Motion-1.0/ckpts/tencent',
+                    '/app/HY-Motion-1.0/ckpts/tencent',
                 ]
                 for alt_path in alt_paths:
                     test_path = os.path.join(alt_path, model_name, 'config.yml')
