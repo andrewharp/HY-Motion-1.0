@@ -35,17 +35,37 @@ class HYMotionRetargetingPipeline:
     """Complete pipeline: GLB + Text → Animated GLB with validation."""
     
     def __init__(self, model_path=None, device='cuda'):
-        # Prioritize network drive (/workspace) over Docker image (/app)
-        # Models are in ckpts/tencent/HY-Motion-1.0/ structure
+        # Auto-discover model path from multiple possible locations
+        # Priority: network volume (/workspace) > Docker image (/app)
+        possible_paths = [
+            '/workspace/HY-Motion-1.0/ckpts/tencent',      # Network volume with tencent subdir
+            '/workspace/HY-Motion-1.0/ckpts',               # Network volume flat structure
+            '/app/HY-Motion-1.0/ckpts/tencent',             # Docker image with tencent subdir
+            '/app/HY-Motion-1.0/ckpts',                      # Docker image flat structure
+        ]
+        
         if model_path is None:
-            # Check network drive first
-            if os.path.exists('/workspace/HY-Motion-1.0/ckpts/tencent'):
-                model_path = '/workspace/HY-Motion-1.0/ckpts/tencent'
+            # Find first path that contains the model config
+            for test_path in possible_paths:
+                config_file = os.path.join(test_path, 'HY-Motion-1.0', 'config.yml')
+                if os.path.exists(config_file):
+                    model_path = test_path
+                    print(f"Found model config at: {config_file}")
+                    break
             else:
-                model_path = '/app/HY-Motion-1.0/ckpts/tencent'
-        # Verify the path exists
-        if not os.path.exists(model_path):
-            raise FileNotFoundError(f"Model path not found: {model_path}")
+                # None found - list what we did find for debugging
+                print("ERROR: Could not find model config in any of these locations:")
+                for p in possible_paths:
+                    exists = os.path.exists(p)
+                    print(f"  {p} - {'EXISTS' if exists else 'NOT FOUND'}")
+                    if exists:
+                        # List contents if directory exists
+                        try:
+                            contents = os.listdir(p)
+                            print(f"    Contents: {contents}")
+                        except Exception as e:
+                            print(f"    Error listing: {e}")
+                raise FileNotFoundError(f"Model path not found. Searched: {possible_paths}")
         
         self.model_path = model_path
         self.device = device
@@ -64,19 +84,25 @@ class HYMotionRetargetingPipeline:
         """Load the motion generation model."""
         if self.runtime is None:
             print(f"Loading {model_name}...")
-            # Find config path
+            # Find config path using the discovered model_path
             config_path = os.path.join(self.model_path, model_name, 'config.yml')
             if not os.path.exists(config_path):
-                # Try alternative locations
-                alt_paths = [
+                # Try all possible base paths
+                possible_base_paths = [
                     '/workspace/HY-Motion-1.0/ckpts/tencent',
+                    '/workspace/HY-Motion-1.0/ckpts',
                     '/app/HY-Motion-1.0/ckpts/tencent',
+                    '/app/HY-Motion-1.0/ckpts',
                 ]
-                for alt_path in alt_paths:
-                    test_path = os.path.join(alt_path, model_name, 'config.yml')
+                for alt_base in possible_base_paths:
+                    test_path = os.path.join(alt_base, model_name, 'config.yml')
                     if os.path.exists(test_path):
                         config_path = test_path
+                        self.model_path = alt_base  # Update model_path to where we found it
                         break
+            
+            if not os.path.exists(config_path):
+                raise FileNotFoundError(f"Model config not found at {config_path}. Searched multiple locations.")
             
             print(f"Config path: {config_path}")
             

@@ -38,14 +38,10 @@ async def lifespan(app: FastAPI):
     print("=" * 60)
     print("Starting HY-Motion Retargeting API")
     print("=" * 60)
-    # Use volume-mounted model path (/workspace) for RunPod deployment
-    # Models are in ckpts/tencent/HY-Motion-1.0/ structure
-    model_path = '/workspace/HY-Motion-1.0/ckpts/tencent'
-    if not os.path.exists(model_path):
-        # Fallback to Docker image path
-        model_path = '/app/HY-Motion-1.0/ckpts/tencent'
-    print(f"Using model path: {model_path}")
-    pipeline = HYMotionRetargetingPipeline(model_path=model_path)
+    # Let pipeline auto-discover model path from multiple locations
+    # (supports both /workspace network volume and /app Docker image)
+    print("Auto-discovering model path...")
+    pipeline = HYMotionRetargetingPipeline(model_path=None)  # Auto-discover
     # Model is loaded lazily on first request to avoid startup delays
     print("Pipeline initialized. Model will be loaded on first request.")
     yield
