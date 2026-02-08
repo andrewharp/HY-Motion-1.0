@@ -17,15 +17,12 @@ ENV PYTHONPATH="/app:/app/HY-Motion-1.0:/app/ComfyUI-HyMotion:/app/ComfyUI:${PYT
 ENV CKPTS_DIR=/app/HY-Motion-1.0/ckpts
 ENV COMFYUI_PATH=/app/ComfyUI
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git git-lfs wget curl ca-certificates \
-    libglib2.0-0 libsm6 libxext6 libxrender-dev libgomp1 \
-    libgl1-mesa-glx libgtk-3-0 libgl1 \
-    build-essential protobuf-compiler libprotobuf-dev \
+# Install minimal system dependencies (git-lfs and protobuf)
+RUN apt-get update -qq && apt-get install -y --no-install-recommends \
+    git-lfs protobuf-compiler libprotobuf-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Blender via snap or direct download
+# Install Blender
 RUN wget -q https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz -O /tmp/blender.tar.xz && \
     tar -xf /tmp/blender.tar.xz -C /opt && \
     ln -s /opt/blender-4.0.2-linux-x64/blender /usr/local/bin/blender && \
