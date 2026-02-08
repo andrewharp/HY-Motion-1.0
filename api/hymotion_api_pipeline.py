@@ -34,10 +34,17 @@ from fbx import FbxTime
 class HYMotionRetargetingPipeline:
     """Complete pipeline: GLB + Text → Animated GLB with validation."""
     
-    def __init__(self, model_path='/app/HY-Motion-1.0/ckpts', device='cuda'):
-        # Check if model exists at /app/ (Docker), otherwise use /workspace/ (volume mount)
+    def __init__(self, model_path=None, device='cuda'):
+        # Prioritize network drive (/workspace) over Docker image (/app)
+        if model_path is None:
+            # Check network drive first
+            if os.path.exists('/workspace/HY-Motion-1.0/ckpts'):
+                model_path = '/workspace/HY-Motion-1.0/ckpts'
+            else:
+                model_path = '/app/HY-Motion-1.0/ckpts'
+        # Verify the path exists
         if not os.path.exists(model_path):
-            model_path = '/workspace/HY-Motion-1.0/ckpts'
+            raise FileNotFoundError(f"Model path not found: {model_path}")
         
         self.model_path = model_path
         self.device = device
