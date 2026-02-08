@@ -9,8 +9,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: hy-motion-1.0
-  API_IMAGE_NAME: hy-motion-1.0-api
+  IMAGE_NAME: hymotion
+  API_IMAGE_NAME: hymotion-api
 
 jobs:
   build-api:
