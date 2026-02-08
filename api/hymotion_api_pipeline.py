@@ -15,8 +15,10 @@ from typing import Optional, Dict, Any, Tuple
 import subprocess
 import json
 
-# Add paths for HY-Motion and ComfyUI-HyMotion
-sys.path.insert(0, '/workspace/HY-Motion-1.0')
+# Add paths for HY-Motion and ComfyUI-HyMotion (Docker uses /app/)
+sys.path.insert(0, '/app/HY-Motion-1.0')
+sys.path.insert(0, '/app/ComfyUI-HyMotion')
+sys.path.insert(0, '/workspace/HY-Motion-1.0')  # Fallback for volume mounts
 sys.path.insert(0, '/workspace/ComfyUI-HyMotion')
 
 from hymotion.utils.t2m_runtime import T2MRuntime
@@ -32,11 +34,21 @@ from fbx import FbxTime
 class HYMotionRetargetingPipeline:
     """Complete pipeline: GLB + Text → Animated GLB with validation."""
     
-    def __init__(self, model_path='/workspace/HY-Motion-1.0/ckpts', device='cuda'):
+    def __init__(self, model_path='/app/HY-Motion-1.0/ckpts', device='cuda'):
+        # Check if model exists at /app/ (Docker), otherwise use /workspace/ (volume mount)
+        if not os.path.exists(model_path):
+            model_path = '/workspace/HY-Motion-1.0/ckpts'
+        
         self.model_path = model_path
         self.device = device
         self.runtime = None
-        self.wooden_template = '/workspace/ComfyUI-HyMotion/assets/wooden_models/boy_Rigging_smplx_tex.fbx'
+        
+        # Check wooden template location
+        if os.path.exists('/app/ComfyUI-HyMotion/assets/wooden_models/boy_Rigging_smplx_tex.fbx'):
+            self.wooden_template = '/app/ComfyUI-HyMotion/assets/wooden_models/boy_Rigging_smplx_tex.fbx'
+        else:
+            self.wooden_template = '/workspace/ComfyUI-HyMotion/assets/wooden_models/boy_Rigging_smplx_tex.fbx'
+        
         self.blender_path = '/usr/bin/blender'
         self.temp_dir = tempfile.mkdtemp(prefix='hymotion_api_')
         
@@ -48,16 +60,35 @@ class HYMotionRetargetingPipeline:
             config_path = os.path.join(self.model_path, model_name, 'config.yml')
             if not os.path.exists(config_path):
                 # Try alternative locations
-                config_path = os.path.join('/workspace/HY-Motion-1.0/ckpts', model_name, 'config.yml')
+                alt_paths = [
+                    '/workspace/HY-Motion-1.0/ckpts',
+                    '/app/HY-Motion-1.0/ckpts',
+                ]
+                for alt_path in alt_paths:
+                    test_path = os.path.join(alt_path, model_name, 'config.yml')
+                    if os.path.exists(test_path):
+                        config_path = test_path
+                        break
             
             print(f"Config path: {config_path}")
             
+            # Load model on GPU with text encoder on CPU to save memory
             self.runtime = T2MRuntime(
                 config_path=config_path,
                 skip_text=False,
-                device_ids=[0] if self.device == 'cuda' else None,
+                device_ids=[0],  # Use GPU for motion model
                 disable_prompt_engineering=True
             )
+            
+            # Keep text encoder on CPU to save GPU memory
+            if hasattr(self.runtime, 'pipelines') and self.runtime.pipelines:
+                for pipeline in self.runtime.pipelines:
+                    if hasattr(pipeline, 'text_encoder') and pipeline.text_encoder is not None:
+                        print("Keeping text encoder on CPU to save GPU memory...")
+                        pipeline.text_encoder = pipeline.text_encoder.to('cpu')
+                        # Add a flag to indicate text encoder is on CPU
+                        pipeline._text_encoder_on_cpu = True
+                
             print("Model loaded!")
         return self
     
