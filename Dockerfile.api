@@ -55,16 +55,10 @@ RUN git clone --depth 1 https://github.com/comfyanonymous/ComfyUI.git && \
 # Install ComfyUI-HyMotion specific dependencies
 RUN pip install --no-cache-dir comfy-kitchen comfy-aimdo
 
-# Clone HY-Motion-1.0 and ComfyUI-HyMotion
+# Clone HY-Motion-1.0 and ComfyUI-HyMotion (code only, models on network drive)
 RUN git clone https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && \
     cd HY-Motion-1.0 && git lfs pull || true
 RUN git clone https://github.com/jtydhr88/ComfyUI-HY-Motion1.git ComfyUI-HyMotion
-
-# Download HY-Motion-1.0 model checkpoints from HuggingFace
-RUN mkdir -p /app/HY-Motion-1.0/ckpts/HY-Motion-1.0 && \
-    cd /app/HY-Motion-1.0/ckpts/HY-Motion-1.0 && \
-    huggingface-cli download tencent/HY-Motion-1.0 --local-dir . --local-dir-use-symlinks False || \
-    echo "Note: Model download may require HuggingFace authentication"
 
 # Copy API files (includes patch script)
 COPY api/ /app/api/
