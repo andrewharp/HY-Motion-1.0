@@ -26,6 +26,7 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends \
 RUN wget -q https://download.blender.org/release/Blender4.0/blender-4.0.2-linux-x64.tar.xz -O /tmp/blender.tar.xz && \
     tar -xf /tmp/blender.tar.xz -C /opt && \
     ln -s /opt/blender-4.0.2-linux-x64/blender /usr/local/bin/blender && \
+    ln -s /opt/blender-4.0.2-linux-x64/blender /usr/bin/blender && \
     rm /tmp/blender.tar.xz
 
 # Install Python dependencies
