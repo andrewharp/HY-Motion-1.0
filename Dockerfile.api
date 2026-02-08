@@ -33,7 +33,7 @@ RUN pip install --upgrade pip setuptools wheel
 
 # Install FastAPI and dependencies
 RUN pip install --no-cache-dir \
-    fastapi uvicorn python-multipart pydantic requests aiohttp
+    fastapi uvicorn python-multipart pydantic requests aiohttp openai
 
 # Install HY-Motion dependencies (PyYAML installed via apt)
 RUN pip install --no-cache-dir \

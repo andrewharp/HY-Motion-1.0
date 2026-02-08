@@ -1,0 +1,84 @@
+# Git
+.git
+.gitignore
+.gitattributes
+.gitmodules
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Model checkpoints and cache (large files)
+ckpts/
+hf_cache/
+*.ckpt
+*.pth
+*.bin
+*.safetensors
+
+# Output directories
+output/
+inputs/
+input/
+
+# Logs
+*.log
+logs/
+
+# Documentation
+*.md
+!README.md
+DOCKER_BUILD_REPORT.md
+
+# Docker files themselves
+Dockerfile*
+docker-compose.yml
+.dockerignore
+
+# GitHub
+.github/
+
+# Local scripts
+build.sh
+scripts/
+
+# Misc
+.DS_Store
+*.tar
+*.tar.gz
+*.zip
