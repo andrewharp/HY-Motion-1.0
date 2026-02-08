@@ -17,9 +17,9 @@ ENV PYTHONPATH="/app:/app/HY-Motion-1.0:/app/ComfyUI-HyMotion:/app/ComfyUI:${PYT
 ENV CKPTS_DIR=/app/HY-Motion-1.0/ckpts
 ENV COMFYUI_PATH=/app/ComfyUI
 
-# Install minimal system dependencies (git-lfs and protobuf)
+# Install minimal system dependencies (git-lfs, protobuf, and PyYAML)
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
-    git-lfs protobuf-compiler libprotobuf-dev \
+    git-lfs protobuf-compiler libprotobuf-dev python3-yaml \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Blender
@@ -35,12 +35,12 @@ RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache-dir \
     fastapi uvicorn python-multipart pydantic requests aiohttp
 
-# Install HY-Motion dependencies
+# Install HY-Motion dependencies (PyYAML installed via apt)
 RUN pip install --no-cache-dir \
     huggingface_hub==0.30.0 torchdiffeq==0.2.5 \
     accelerate==0.30.1 diffusers==0.26.3 transformers==4.53.3 \
     einops==0.8.1 safetensors==0.5.3 scipy>=1.10.0 \
-    transforms3d==0.4.2 PyYAML==6.0 omegaconf==2.3.0 click==8.1.3
+    transforms3d==0.4.2 omegaconf==2.3.0 click==8.1.3
 
 # Install FBX SDK
 RUN pip install --no-cache-dir fbxsdkpy
