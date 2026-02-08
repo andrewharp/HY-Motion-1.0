@@ -12,8 +12,9 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PIP_NO_CACHE_DIR=1
 
 # Set up environment
-ENV PYTHONPATH="/app:/app/HY-Motion-1.0:/app/ComfyUI-HyMotion:${PYTHONPATH}"
+ENV PYTHONPATH="/app:/app/HY-Motion-1.0:/app/ComfyUI-HyMotion:/app/ComfyUI:${PYTHONPATH}"
 ENV CKPTS_DIR=/app/HY-Motion-1.0/ckpts
+ENV COMFYUI_PATH=/app/ComfyUI
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -29,7 +30,7 @@ RUN pip install --upgrade pip setuptools wheel
 
 # Install FastAPI and dependencies
 RUN pip install --no-cache-dir \
-    fastapi uvicorn python-multipart pydantic requests
+    fastapi uvicorn python-multipart pydantic requests aiohttp
 
 # Install HY-Motion dependencies
 RUN pip install --no-cache-dir \
@@ -41,16 +42,28 @@ RUN pip install --no-cache-dir \
 # Install FBX SDK
 RUN pip install --no-cache-dir fbxsdkpy
 
-# Clone dependencies
+# Clone ComfyUI (required for text encoder)
 WORKDIR /app
+RUN git clone https://github.com/comfyanonymous/ComfyUI.git && \
+    cd ComfyUI && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Clone HY-Motion-1.0 and ComfyUI-HyMotion
 RUN git clone https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && \
     cd HY-Motion-1.0 && git lfs pull || true
 RUN git clone https://github.com/antoineeripret/ComfyUI-HyMotion.git
 
+# Download model weights
+RUN mkdir -p /app/HY-Motion-1.0/ckpts && \
+    cd /app/HY-Motion-1.0/ckpts && \
+    pip install -q huggingface_hub && \
+    python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='tencent/HY-Motion-1.0', local_dir='HY-Motion-1.0', local_dir_use_symlinks=False)" || \
+    echo "Model download skipped - will download at runtime"
+
 # Copy API files
 COPY api/ /app/api/
 
-# Fix config path
+# Fix config paths
 RUN sed -i 's|mean_std_dir: ./stats/|mean_std_dir: /app/HY-Motion-1.0/stats/|g' \
     /app/HY-Motion-1.0/ckpts/HY-Motion-1.0/config.yml || true
 
@@ -58,7 +71,7 @@ WORKDIR /app
 
 EXPOSE 8000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
     CMD python3 -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
 
 CMD ["python3", "/app/api/api_service.py"]
