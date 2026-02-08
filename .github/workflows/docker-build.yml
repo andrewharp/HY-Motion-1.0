@@ -58,7 +58,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-api:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     name: Build API Image (with baked models)
     permissions:
       contents: read
@@ -117,7 +117,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   build-serverless:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     name: Build Serverless Image (with models)
     if: github.ref == 'refs/heads/feature/runpod-serverless' || github.event_name == 'workflow_dispatch'
     permissions:
