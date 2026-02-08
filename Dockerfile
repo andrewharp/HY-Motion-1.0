@@ -66,7 +66,7 @@ RUN pip install --no-cache-dir \
     "numpy>=1.24.0,<2.0" \
     scipy>=1.10.0 \
     transforms3d==0.4.2 \
-    PyYAML==6.0 \
+    "PyYAML>=6.0.1" \
     omegaconf==2.3.0 \
     click==8.1.3 \
     requests==2.32.4 \
