@@ -1,47 +1,38 @@
-name: Docker Build and Push
+name: Docker Build and Deploy
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  API_IMAGE_NAME: ${{ github.repository }}-api
 
 jobs:
-  build:
+  build-base:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-      attestations: write
-      id-token: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Free up disk space
         run: |
-          echo "Freeing up disk space..."
-          df -h
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
           sudo apt-get clean
           docker system prune -af
-          df -h
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
@@ -49,55 +40,80 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push Docker image
-        id: build-push
+      - name: Build and push base image
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Generate artifact attestation
-        if: github.event_name != 'pull_request' && steps.build-push.outputs.digest != ''
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          subject-digest: ${{ steps.build-push.outputs.digest }}
-          push-to-registry: true
+  build-api:
+    runs-on: ubuntu-latest
+    needs: build-base
+    permissions:
+      contents: read
+      packages: write
 
-      - name: Report build status
-        if: always()
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.api
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-runpod:
+    needs: build-api
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    
+    steps:
+      - name: Deploy to RunPod
+        env:
+          RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
         run: |
-          echo "============================================"
-          echo "Docker Build Status Report"
-          echo "============================================"
-          echo "Repository: ${{ github.repository }}"
-          echo "Branch: ${{ github.ref_name }}"
-          echo "Commit: ${{ github.sha }}"
-          echo "Build Status: ${{ job.status }}"
-          if [ "${{ job.status }}" == "success" ]; then
-            echo ""
-            echo "✅ Docker image built and pushed successfully!"
-            echo ""
-            echo "Docker Image Tags:"
-            echo "${{ steps.meta.outputs.tags }}"
-            echo ""
-            echo "Image URL: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          else
-            echo "❌ Build failed"
+          if [ -z "$RUNPOD_API_KEY" ]; then
+            echo "⚠️ RUNPOD_API_KEY not set. Skipping deployment."
+            echo "To deploy automatically, add RUNPOD_API_KEY to GitHub secrets."
+            exit 0
           fi
-          echo "============================================"
+          
+          echo "Installing RunPod CLI..."
+          curl -s https://runpod.io/install-runpodctl.sh | bash
+          
+          # Check if pod already exists and terminate it
+          echo "Checking for existing pod..."
+          runpodctl get pod 2>/dev/null | grep "hymotion-api" && \
+            runpodctl stop pod hymotion-api 2>/dev/null || true
+          
+          echo "Creating new RunPod..."
+          runpodctl create pod \
+            --name "hymotion-api" \
+            --gpuType "NVIDIA GeForce RTX 5090" \
+            --imageName "${{ env.REGISTRY }}/${{ env.API_IMAGE_NAME }}:latest" \
+            --containerDiskSize 50 \
+            --volumeSize 100 \
+            --ports "8000/http" \
+            --env "PYTHONUNBUFFERED=1"
+          
+          echo "✅ Deployed to RunPod!"
