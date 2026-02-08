@@ -20,9 +20,10 @@ ENV USE_HF_MODELS=0
 ENV HF_HOME=/app/.cache/huggingface
 
 # Install system dependencies (including X11 libs for Blender)
+# Ubuntu 24.04 package names (different from 22.04)
 RUN apt-get update -qq && apt-get install -y --no-install-recommends \
     git-lfs protobuf-compiler libprotobuf-dev python3-yaml \
-    libgl1-mesa-glx libxi6 libxrender1 libxkbcommon0 libsm6 libexpat1 \
+    libgl1 libxi6 libxrender1 libxkbcommon0 libsm6 libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Blender
