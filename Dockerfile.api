@@ -80,7 +80,6 @@ RUN mkdir -p ckpts/tencent
 # Copy API files
 COPY api/ /app/api/
 COPY hymotion/ /app/hymotion/
-COPY stats/ /app/stats/
 
 # Fix text_encoder meta tensor issue
 RUN python3 /app/api/patch_text_encoder.py || echo "Patch script completed"
