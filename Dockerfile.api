@@ -85,9 +85,7 @@ COPY stats/ /app/stats/
 # Fix text_encoder meta tensor issue
 RUN python3 /app/api/patch_text_encoder.py || echo "Patch script completed"
 
-# Fix config paths for container
-RUN sed -i 's|mean_std_dir: ./stats/|mean_std_dir: /app/stats/|g' \
-    /app/HY-Motion-1.0/ckpts/tencent/HY-Motion-1.0/config.yml
+# Note: config.yml path fix is done at runtime since models are on network volume
 
 WORKDIR /app
 
