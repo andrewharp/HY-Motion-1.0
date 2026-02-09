@@ -67,46 +67,15 @@ RUN git clone --depth 1 https://github.com/Tencent-Hunyuan/HY-Motion-1.0.git && 
 RUN git clone --depth 1 https://github.com/jtydhr88/ComfyUI-HY-Motion1.git ComfyUI-HyMotion
 
 # =============================================================================
-# DOWNLOAD MODELS DURING BUILD (baked into image)
+# MODELS ARE MOUNTED VIA NETWORK VOLUME (not baked into image)
 # =============================================================================
+# Expected mount: /workspace/HY-Motion-1.0/ckpts/ -> /app/HY-Motion-1.0/ckpts/
+# Or models can be downloaded at runtime using download_models.py
 
 WORKDIR /app/HY-Motion-1.0
 
-# Create ckpts directory structure
+# Create ckpts directory structure (will be mounted over at runtime)
 RUN mkdir -p ckpts/tencent
-
-# Download HY-Motion-1.0 models from HuggingFace
-# Disable hf_transfer to avoid dependency issues
-ENV HF_HUB_ENABLE_HF_TRANSFER=0
-RUN echo "=== Downloading HY-Motion-1.0 models ===" && \
-    huggingface-cli download tencent/HY-Motion-1.0 \
-        --include "HY-Motion-1.0/*" \
-        --local-dir ckpts/tencent \
-        --local-dir-use-symlinks False && \
-    echo "✓ HY-Motion-1.0 models downloaded"
-
-# Download CLIP text encoder
-RUN echo "=== Downloading CLIP text encoder ===" && \
-    huggingface-cli download openai/clip-vit-large-patch14 \
-        --local-dir ckpts/clip-vit-large-patch14 \
-        --local-dir-use-symlinks False && \
-    echo "✓ CLIP downloaded"
-
-# Download Qwen text encoder (optional, for prompt rewriting)
-RUN echo "=== Downloading Qwen text encoder ===" && \
-    huggingface-cli download Qwen/Qwen3-8B \
-        --local-dir ckpts/Qwen3-8B \
-        --local-dir-use-symlinks False || \
-    echo "⚠ Qwen download failed (optional)"
-
-# Verify models are present
-RUN echo "=== Verifying model files ===" && \
-    ls -lah ckpts/tencent/HY-Motion-1.0/ && \
-    test -f ckpts/tencent/HY-Motion-1.0/config.yml && \
-    (test -f ckpts/tencent/HY-Motion-1.0/latest.ckpt || \
-     test -f ckpts/tencent/HY-Motion-1.0/latest.pt) && \
-    echo "✓ Model files verified" && \
-    du -sh ckpts/
 
 # Copy API files
 COPY api/ /app/api/
