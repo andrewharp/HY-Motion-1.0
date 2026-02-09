@@ -2,10 +2,21 @@ name: Docker Build and Deploy
 
 on:
   push:
-    branches: [ main, master, feature/baked-models, feature/runpod-serverless ]
+    branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Build target'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - main
+          - api
+          - serverless:
 
 env:
   REGISTRY: ghcr.io
@@ -108,7 +119,7 @@ jobs:
   build-serverless:
     runs-on: self-hosted
     name: Build Serverless Image (models mounted via volume)
-    if: github.ref == 'refs/heads/feature/runpod-serverless' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && (inputs.build_target == 'serverless' || inputs.build_target == 'all')
     permissions:
       contents: read
       packages: write
@@ -163,6 +174,10 @@ jobs:
     permissions:
       contents: read
       packages: read
+      pull-requests: write
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Report build status
@@ -187,9 +202,50 @@ jobs:
           else
             echo "❌ One or more core builds failed"
           fi
-          
+
           if [ "${{ needs.build-serverless.result }}" = "success" ]; then
             echo ""
             echo "✅ Serverless build succeeded!"
             echo "   - ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:latest"
           fi
+
+      - name: Comment PR with build status
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const mainStatus = '${{ needs.build-main.result }}';
+            const apiStatus = '${{ needs.build-api.result }}';
+            const serverlessStatus = '${{ needs.build-serverless.result }}';
+
+            const statusEmoji = (status) => {
+              if (status === 'success') return '✅';
+              if (status === 'failure') return '❌';
+              if (status === 'skipped') return '⏭️';
+              return '⏳';
+            };
+
+            const body = `## 🐳 Docker Build Status
+
+| Image | Status |
+|-------|--------|
+| Main | ${statusEmoji(mainStatus)} ${mainStatus} |
+| API | ${statusEmoji(apiStatus)} ${apiStatus} |
+| Serverless | ${statusEmoji(serverlessStatus)} ${serverlessStatus} |
+
+${mainStatus === 'success' && apiStatus === 'success' ? '✅ All core builds passed!' : '⚠️ Some builds failed or were skipped.'}
+
+*Note: PR builds are dry runs - images are not pushed to GHCR.*
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Set workflow output
+        if: always()
+        run: |
+          echo "build_status=$(if [ '${{ needs.build-main.result }}' = 'success' ] && [ '${{ needs.build-api.result }}' = 'success' ]; then echo 'success'; elif [ '${{ needs.build-main.result }}' = 'failure' ] || [ '${{ needs.build-api.result }}' = 'failure' ]; then echo 'failure'; else echo 'skipped'; fi)" >> $GITHUB_OUTPUT

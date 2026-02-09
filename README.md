@@ -6,6 +6,9 @@
 </p>
 
 <div align="center">
+  <a href="https://github.com/andrewharp/HY-Motion-1.0/actions/workflows/docker-build.yml" target="_blank">
+    <img src="https://github.com/andrewharp/HY-Motion-1.0/actions/workflows/docker-build.yml/badge.svg?branch=main" height="22px" alt="Docker Build">
+  </a>
   <a href="https://hunyuan.tencent.com/motion" target="_blank">
     <img src="https://img.shields.io/badge/Official%20Site-333399.svg?logo=homepage" height="22px" alt="Official Site">
   </a>
