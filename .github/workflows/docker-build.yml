@@ -14,7 +14,7 @@ env:
 
 jobs:
   build-main:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     name: Build Main Image
     permissions:
       contents: read
@@ -153,7 +153,7 @@ jobs:
           echo "  ./scripts/wait-for-runpod.sh ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:${{ steps.short-sha.outputs.sha }}"
 
   status-report:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     name: Build Status Report
     needs: [build-main, build-api, build-serverless]
     if: always()
