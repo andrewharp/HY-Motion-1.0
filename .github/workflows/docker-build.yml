@@ -24,12 +24,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          docker system prune -af
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -77,13 +71,6 @@ jobs:
           ls -lah ckpts/tencent/HY-Motion-1.0/ 2>/dev/null || echo "No HY-Motion-1.0 models"
           du -sh ckpts/ 2>/dev/null || echo "Cannot check size"
 
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          docker system prune -af
-          df -h
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -129,13 +116,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           lfs: true
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          docker system prune -af
-          df -h
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
