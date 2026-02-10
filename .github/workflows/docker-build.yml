@@ -2,9 +2,12 @@ name: Docker Build and Deploy
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, feature/* ]
   pull_request:
     branches: [ main, master ]
+  schedule:
+    # Weekly rebuild on Sundays at 3 AM UTC to pick up security updates
+    - cron: '0 3 * * 0'
   workflow_dispatch:
     inputs:
       build_target:
@@ -175,9 +178,6 @@ jobs:
       contents: read
       packages: read
       pull-requests: write
-    permissions:
-      contents: read
-      packages: read
 
     steps:
       - name: Report build status
