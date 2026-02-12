@@ -1,39 +1,73 @@
-name: Docker Build and Deploy
+name: Docker Build and Push
 
 on:
   push:
     branches: [ main, master ]
+    paths:
+      - 'Dockerfile*'
+      - 'requirements.txt'
+      - 'api/**'
+      - '.github/workflows/docker-build.yml'
   pull_request:
     branches: [ main, master ]
+    paths:
+      - 'Dockerfile*'
+      - 'requirements.txt'
+      - 'api/**'
+      - '.github/workflows/docker-build.yml'
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: 'Build target'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - main
+          - api
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: hymotion
-  API_IMAGE_NAME: hymotion-api
+  IMAGE_NAME: ${{ github.repository }}
+  MAIN_IMAGE_TAG: hymotion
+  API_IMAGE_TAG: hymotion-api
 
 jobs:
-  build-main:
+  # Determine runner type - use self-hosted if available, otherwise ubuntu-latest
+  setup:
     runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.detect.outputs.runner }}
+      cuda_available: ${{ steps.detect.outputs.cuda_available }}
+    steps:
+      - name: Detect runner availability
+        id: detect
+        run: |
+          # Check if self-hosted runner with 'gpu' label is available
+          # For now, default to ubuntu-latest for broader compatibility
+          # Set to 'self-hosted' if you have a self-hosted runner registered
+          echo "runner=ubuntu-latest" >> $GITHUB_OUTPUT
+          echo "cuda_available=false" >> $GITHUB_OUTPUT
+          echo "Using runner: ubuntu-latest (no GPU)"
+          echo "Note: Set runner to 'self-hosted' if you have a GPU runner registered"
+
+  build-main:
+    needs: setup
+    runs-on: ${{ needs.setup.outputs.runner }}
     name: Build Main Image
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          docker system prune -af
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
@@ -41,43 +75,45 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get short SHA
-        id: short-sha
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push main image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${{ steps.short-sha.outputs.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64
 
   build-api:
-    runs-on: ubuntu-latest
+    needs: setup
+    runs-on: ${{ needs.setup.outputs.runner }}
     name: Build API Image
     permissions:
       contents: read
       packages: write
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          docker system prune -af
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GHCR
+      - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
@@ -85,113 +121,56 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Get short SHA
-        id: short-sha
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix=,suffix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build and push API image
+      - name: Build and push API Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile.api
           push: ${{ github.event_name != 'pull_request' }}
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:latest
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:${{ steps.short-sha.outputs.sha }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64
 
-  build-serverless:
+  # Build status summary
+  build-summary:
+    needs: [build-main, build-api]
     runs-on: ubuntu-latest
-    name: Build Serverless Image (with models)
-    if: github.ref == 'refs/heads/feature/runpod-serverless' || github.event_name == 'workflow_dispatch'
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout with LFS
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-
-      - name: Free up disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /opt/ghc "/usr/local/share/boost" "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          docker system prune -af
-          df -h
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Get short SHA
-        id: short-sha
-        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Build and push serverless image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.serverless-baked
-          push: true
-          tags: |
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:latest
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:${{ steps.short-sha.outputs.sha }}
-            ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:${{ github.ref_name }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Report serverless image
-        run: |
-          echo "✅ Serverless image built!"
-          echo "📦 Image: ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:${{ steps.short-sha.outputs.sha }}"
-          echo ""
-          echo "To deploy:"
-          echo "  ./scripts/wait-for-runpod.sh ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:${{ steps.short-sha.outputs.sha }}"
-
-  status-report:
-    runs-on: ubuntu-latest
-    name: Build Status Report
-    needs: [build-main, build-api, build-serverless]
     if: always()
-    permissions:
-      contents: read
-      packages: read
-
+    name: Build Summary
     steps:
       - name: Report build status
         run: |
           echo "=========================================="
-          echo "HY-Motion-1.0 Docker Build Status Report"
+          echo "HY-Motion-1.0 Docker Build Summary"
           echo "=========================================="
           echo ""
-          echo "Main Image Build: ${{ needs.build-main.result }}"
-          echo "API Image Build: ${{ needs.build-api.result }}"
-          echo "Serverless Build: ${{ needs.build-serverless.result }}"
+          echo "Main Image: ${{ needs.build-main.result }}"
+          echo "API Image:  ${{ needs.build-api.result }}"
           echo ""
-          if [ "${{ needs.build-main.result }}" = "success" ] && [ "${{ needs.build-api.result }}" = "success" ]; then
-            echo "✅ Core builds succeeded!"
-            if [ "${{ github.event_name }}" != "pull_request" ]; then
-              echo "📦 Images pushed to GHCR:"
-              echo "   - ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:latest"
-              echo "   - ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.API_IMAGE_NAME }}:latest"
-            else
-              echo "📋 PR build - images not pushed (dry run)"
-            fi
-          else
-            echo "❌ One or more core builds failed"
-          fi
           
-          if [ "${{ needs.build-serverless.result }}" = "success" ]; then
-            echo ""
-            echo "✅ Serverless build succeeded!"
-            echo "   - ${{ env.REGISTRY }}/${{ github.repository_owner }}/hymotion-serverless:latest"
+          if [ "${{ needs.build-main.result }}" = "success" ] && [ "${{ needs.build-api.result }}" = "success" ]; then
+            echo "✅ All builds succeeded!"
+            if [ "${{ github.event_name }}" != "pull_request" ]; then
+              echo ""
+              echo "📦 Images pushed to GHCR:"
+              echo "   - ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+              echo "   - ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:latest"
+            fi
+            exit 0
+          else
+            echo "❌ One or more builds failed"
+            exit 1
           fi
