@@ -29,9 +29,8 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  MAIN_IMAGE_TAG: hymotion
-  API_IMAGE_TAG: hymotion-api
+  # Use github.actor for the namespace and lowercase repo name for GHCR compatibility
+  IMAGE_BASE: ghcr.io/${{ github.actor }}/hy-motion-1.0
 
 jobs:
   # Determine runner type - use self-hosted if available, otherwise ubuntu-latest
@@ -79,7 +78,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.IMAGE_BASE }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -125,7 +124,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
+          images: ${{ env.IMAGE_BASE }}-api
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -166,8 +165,8 @@ jobs:
             if [ "${{ github.event_name }}" != "pull_request" ]; then
               echo ""
               echo "📦 Images pushed to GHCR:"
-              echo "   - ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-              echo "   - ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api:latest"
+              echo "   - ${{ env.IMAGE_BASE }}:latest"
+              echo "   - ${{ env.IMAGE_BASE }}-api:latest"
             fi
             exit 0
           else
